@@ -9,9 +9,11 @@ import {
   DialogContent,
   DialogTitle,
   Typography,
-	InputLabel,
-	Select,
-	MenuItem,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControl,
+  FormHelperText,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { useEffect, useState, useRef } from "react";
@@ -79,6 +81,42 @@ const Payout = () => {
   const [lastDocs, setLastDocs] = useState({});
   const [totalRows, setTotalRows] = useState(0);
   const cache = useRef({ counts: {}, lastFetched: null });
+  // Added state for validation errors
+  const [errors, setErrors] = useState({
+    transactionId: "",
+    status: "",
+  });
+
+  // Validation function for transaction ID
+  const validateTransactionId = (value) => {
+    if (!value) {
+      return "Transaction ID is required";
+    }
+    if (!/^[a-zA-Z0-9]+$/.test(value)) {
+      return "Only letters and numbers are allowed";
+    }
+    return "";
+  };
+
+  // Handle transaction ID change with validation
+  const handleTransactionIdChange = (e) => {
+    const value = e.target.value;
+    setTransactionId(value);
+    setErrors((prev) => ({
+      ...prev,
+      transactionId: validateTransactionId(value),
+    }));
+  };
+
+  // Handle status change with validation
+  const handleStatusChange = (e) => {
+    const value = e.target.value;
+    setStatus(value);
+    setErrors((prev) => ({
+      ...prev,
+      status: value ? "" : "Status is required",
+    }));
+  };
 
   useEffect(() => {
     const fetchPayouts = async () => {
@@ -215,12 +253,14 @@ const Payout = () => {
     setSelectedRow(row);
     setTransactionId(row.transaction_id || "");
     setStatus(row.status || "");
+    setErrors({ transactionId: "", status: "" });
     setOpenUpdateDialog(true);
   };
 
   const handleCloseUpdateDialog = () => {
     setOpenUpdateDialog(false);
     setSelectedRow(null);
+    setErrors({ transactionId: "", status: "" });
   };
 
   const handleOpenBankDialog = (row) => {
@@ -233,105 +273,21 @@ const Payout = () => {
     setSelectedRow(null);
   };
 
-  // const handleUpdateStatus = async () => {
-  //   if (!selectedRow) return;
-
-  //   try {
-  //     const docRef = doc(
-  //       db,
-  //       "payouts",
-  //       selectedRow.payoutDate,
-  //       "pradhaan_payouts",
-  //       selectedRow.id
-  //     );
-  //     await updateDoc(docRef, {
-  //       status: status,
-  //       transaction_id: transactionId,
-  //     });
-
-  //     setTransactions((prev) =>
-  //       prev.map((t) =>
-  //         t.id === selectedRow.id && t.payoutDate === selectedRow.payoutDate
-  //           ? { ...t, status, transaction_id: transactionId }
-  //           : t
-  //       )
-  //     );
-  //     handleCloseUpdateDialog();
-  //     alert("Updated successfully!");
-  //   } catch (error) {
-  //     console.error("Failed to update document:", error);
-  //     alert("Failed to update!");
-  //   }
-  // };
-
-  // new one
-
-  // const handleUpdateStatus = async () => {
-  //   if (!selectedRow) return;
-
-  //   try {
-  //     // Ensure user_id exists in selectedRow
-  //     if (!selectedRow.user_id) {
-  //       throw new Error("User ID is missing in payout data");
-  //     }
-
-  //     const payoutDocRef = doc(
-  //       db,
-  //       "payouts",
-  //       selectedRow.payoutDate,
-  //       "pradhaan_payouts",
-  //       selectedRow.id
-  //     );
-  //     const walletDocRef = doc(db, "wallets", selectedRow.user_id);
-
-  //     await runTransaction(db, async (transaction) => {
-  //       // Read the wallet document
-  //       const walletDoc = await transaction.get(walletDocRef);
-  //       if (!walletDoc.exists()) {
-  //         throw new Error("Wallet document does not exist for user ID: " + selectedRow.user_id);
-  //       }
-
-  //       // Get current used_amount and amount_due
-  //       const walletData = walletDoc.data();
-  //       const currentUsedAmount = walletData.used_amount || 0;
-  //       const payoutAmountDue = selectedRow.amount_due || 0;
-
-  //       // Check if subtraction would result in negative used_amount
-  //       const newUsedAmount = currentUsedAmount - payoutAmountDue;
-  //       if (newUsedAmount < 0) {
-  //         throw new Error("Cannot subtract: used_amount would become negative");
-  //       }
-
-  //       // Update payout document
-  //       transaction.update(payoutDocRef, {
-  //         status: status,
-  //         transaction_id: transactionId,
-  //       });
-
-  //       // Update wallet document by subtracting amount_due from used_amount
-  //       transaction.update(walletDocRef, {
-  //         used_amount: newUsedAmount,
-  //       });
-  //     });
-
-  //     // Update local state for immediate UI feedback
-  //     setTransactions((prev) =>
-  //       prev.map((t) =>
-  //         t.id === selectedRow.id && t.payoutDate === selectedRow.payoutDate
-  //           ? { ...t, status, transaction_id: transactionId }
-  //           : t
-  //       )
-  //     );
-  //     handleCloseUpdateDialog();
-  //     alert("Updated successfully!");
-  //   } catch (error) {
-  //     console.error("Failed to update documents:", error);
-  //     alert(error.message || "Failed to update!");
-  //   }
-  // };
-
   const handleUpdateStatus = async () => {
     if (!selectedRow) return;
+
+    // Validate inputs before proceeding
+    const transactionIdError = validateTransactionId(transactionId);
+    const statusError = status ? "" : "Status is required";
+
+    setErrors({
+      transactionId: transactionIdError,
+      status: statusError,
+    });
+
+    if (transactionIdError || statusError) {
+      return;
+    }
 
     try {
       // Ensure user_id exists in selectedRow
@@ -365,7 +321,7 @@ const Payout = () => {
         // Check if subtraction would result in negative used_amount
         const newUsedAmount = currentUsedAmount - payoutAmountDue;
         if (newUsedAmount < 0) {
-          throw new Error("Cannot subtract: used_amount would become negative");
+          throw new Error("Payment Already paid!.");
         }
 
         // Update payout document
@@ -389,22 +345,29 @@ const Payout = () => {
         )
       );
       handleCloseUpdateDialog();
-      // Use SweetAlert2 for success message
+      // Use SweetAlert2 for success message with custom z-index
       Swal.fire({
         icon: "success",
         title: "Success",
         text: "Updated successfully!",
         timer: 2000,
         showConfirmButton: false,
+        customClass: {
+          popup: "custom-swal-zindex",
+        },
       });
     } catch (error) {
       console.error("Failed to update documents:", error);
-      // Use SweetAlert2 for error message
+      handleCloseUpdateDialog(); // Close the dialog on error
       Swal.fire({
         icon: "error",
         title: "Error",
         text: error.message || "Failed to update!",
         confirmButtonText: "OK",
+        customClass: {
+          popup: "custom-swal-zindex",
+          confirmButton: "custom-swal-confirm-button", // Ensure confirm button is always visible
+        },
       });
     }
   };
@@ -555,19 +518,31 @@ const Payout = () => {
             fullWidth
             variant="outlined"
             value={transactionId}
-            onChange={(e) => setTransactionId(e.target.value)}
+            onChange={handleTransactionIdChange}
+            error={!!errors.transactionId}
+            helperText={errors.transactionId}
+            inputProps={{
+              pattern: "[a-zA-Z0-9]*",
+            }}
           />
-          <InputLabel id="status-select-label">Status</InputLabel>
-          <Select
-            labelId="status-select-label"
-            id="status-select"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            label="Status"
-          >
-            <MenuItem value="Success">Success</MenuItem>
-            <MenuItem value="Pending">Pending</MenuItem>
-          </Select>
+          <FormControl fullWidth margin="dense" error={!!errors.status}>
+            <InputLabel id="status-select-label">Status</InputLabel>
+            <Select
+              labelId="status-select-label"
+              id="status-select"
+              value={status}
+              onChange={handleStatusChange}
+              label="Status"
+              required
+            >
+              <MenuItem value="" disabled>
+                Select Status
+              </MenuItem>
+              <MenuItem value="Success">Success</MenuItem>
+              <MenuItem value="Pending">Pending</MenuItem>
+            </Select>
+            {errors.status && <FormHelperText>{errors.status}</FormHelperText>}
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseUpdateDialog}>Cancel</Button>
@@ -575,6 +550,7 @@ const Payout = () => {
             onClick={handleUpdateStatus}
             variant="contained"
             color="primary"
+            disabled={!!errors.transactionId || !!errors.status}
           >
             Update
           </Button>

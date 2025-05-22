@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.custom-swal-zindex {
+  z-index: 1500 !important;
+}
+
+.custom-swal-confirm-button {
+  opacity: 1 !important;
+  background-color: black;
+  color:azure;
+  visibility: visible !important;
+  transition: none !important;
+}
